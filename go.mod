@@ -1,3 +1,3 @@
-module github.com/go-zookeeper/zk
+module github.com/NurramoX/gozookeeper
 
 go 1.24.1
