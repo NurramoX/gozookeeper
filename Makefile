@@ -16,7 +16,8 @@ PACKAGES := $(shell go list ./... | grep -v examples)
 .DEFAULT_GOAL := test
 
 $(ZK):
-	wget $(ZK_URL)
+#	wget $(ZK_URL)
+	curl -LO $(ZK_URL)
 	tar -zxf $(ZK).tar.gz
 	rm $(ZK).tar.gz
 
