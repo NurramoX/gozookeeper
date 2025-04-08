@@ -16,7 +16,7 @@ limitations under the License.
 
 // Vendored from go4.org/net/throttle
 
-package zk
+package tests
 
 import (
 	"fmt"
@@ -42,8 +42,8 @@ func (r Rate) byteTime(n int) time.Duration {
 
 type Listener struct {
 	net.Listener
-	Down Rate // server Writes to Client
-	Up   Rate // server Reads from client
+	Down Rate // Server Writes to Client
+	Up   Rate // Server Reads from client
 }
 
 func (ln *Listener) Accept() (net.Conn, error) {
@@ -52,7 +52,7 @@ func (ln *Listener) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	tc := &conn{Conn: c, Down: ln.Down, Up: ln.Up}
+	tc := &testConn{Conn: c, Down: ln.Down, Up: ln.Up}
 	tc.start()
 	return tc, nil
 }
@@ -68,7 +68,7 @@ type writeReq struct {
 	resc    chan nErr
 }
 
-type conn struct {
+type testConn struct {
 	net.Conn
 	Down Rate // for reads
 	Up   Rate // for writes
@@ -78,12 +78,12 @@ type conn struct {
 	closeErr  error
 }
 
-func (c *conn) start() {
+func (c *testConn) start() {
 	c.wchan = make(chan writeReq, 1024)
 	go c.writeLoop()
 }
 
-func (c *conn) writeLoop() {
+func (c *testConn) writeLoop() {
 	for req := range c.wchan {
 		time.Sleep(req.writeAt.Sub(time.Now()))
 		var res nErr
@@ -102,7 +102,7 @@ func (c *conn) writeLoop() {
 	}
 }
 
-func (c *conn) Close() error {
+func (c *testConn) Close() error {
 	c.closeOnce.Do(func() {
 		err := c.Conn.Close()
 		close(c.wchan)
@@ -111,7 +111,7 @@ func (c *conn) Close() error {
 	return c.closeErr
 }
 
-func (c *conn) Write(p []byte) (n int, err error) {
+func (c *testConn) Write(p []byte) (n int, err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			n = 0
@@ -125,10 +125,11 @@ func (c *conn) Write(p []byte) (n int, err error) {
 	return res.n, res.err
 }
 
-func (c *conn) Read(p []byte) (n int, err error) {
-	const max = 1024
-	if len(p) > max {
-		p = p[:max]
+func (c *testConn) Read(p []byte) (n int, err error) {
+	//m = max
+	const m = 1024
+	if len(p) > m {
+		p = p[:m]
 	}
 	n, err = c.Conn.Read(p)
 	time.Sleep(c.Down.byteTime(n))

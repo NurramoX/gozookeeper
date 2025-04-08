@@ -10,11 +10,11 @@ import (
 
 const _defaultLookupTimeout = 3 * time.Second
 
-type lookupHostFn func(context.Context, string) ([]string, error)
+type LookupHostFn func(context.Context, string) ([]string, error)
 
 // DNSHostProviderOption is an option for the DNSHostProvider.
 type DNSHostProviderOption interface {
-	apply(*DNSHostProvider)
+	Apply(*DNSHostProvider)
 }
 
 type lookupTimeoutOption struct {
@@ -28,8 +28,8 @@ func WithLookupTimeout(timeout time.Duration) DNSHostProviderOption {
 	}
 }
 
-func (o lookupTimeoutOption) apply(provider *DNSHostProvider) {
-	provider.lookupTimeout = o.timeout
+func (o lookupTimeoutOption) Apply(provider *DNSHostProvider) {
+	provider.LookupTimeout = o.timeout
 }
 
 // DNSHostProvider is the default HostProvider. It currently matches
@@ -41,15 +41,15 @@ type DNSHostProvider struct {
 	servers       []string
 	curr          int
 	last          int
-	lookupTimeout time.Duration
-	lookupHost    lookupHostFn // Override of net.LookupHost, for testing.
+	LookupTimeout time.Duration
+	LookupHost    LookupHostFn // Override of net.LookupHost, for testing.
 }
 
 // NewDNSHostProvider creates a new DNSHostProvider with the given options.
 func NewDNSHostProvider(options ...DNSHostProviderOption) *DNSHostProvider {
 	var provider DNSHostProvider
 	for _, option := range options {
-		option.apply(&provider)
+		option.Apply(&provider)
 	}
 	return &provider
 }
@@ -61,13 +61,13 @@ func (hp *DNSHostProvider) Init(servers []string) error {
 	hp.mu.Lock()
 	defer hp.mu.Unlock()
 
-	lookupHost := hp.lookupHost
+	lookupHost := hp.LookupHost
 	if lookupHost == nil {
 		var resolver net.Resolver
 		lookupHost = resolver.LookupHost
 	}
 
-	timeout := hp.lookupTimeout
+	timeout := hp.LookupTimeout
 	if timeout == 0 {
 		timeout = _defaultLookupTimeout
 	}

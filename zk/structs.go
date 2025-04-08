@@ -91,32 +91,32 @@ type ServerStats struct {
 	Error       error
 }
 
-type requestHeader struct {
+type RequestHeader struct {
 	Xid    int32
 	Opcode int32
 }
 
-type responseHeader struct {
+type ResponseHeader struct {
 	Xid  int32
 	Zxid int64
 	Err  ErrCode
 }
 
-type multiHeader struct {
+type MultiHeader struct {
 	Type int32
 	Done bool
 	Err  ErrCode
 }
 
-type auth struct {
+type Auth struct {
 	Type   int32
 	Scheme string
 	Auth   []byte
 }
 
-// Generic request structs
+// Generic Request structs
 
-type pathRequest struct {
+type PathRequest struct {
 	Path string
 }
 
@@ -125,16 +125,16 @@ type PathVersionRequest struct {
 	Version int32
 }
 
-type pathWatchRequest struct {
+type PathWatchRequest struct {
 	Path  string
 	Watch bool
 }
 
-type pathResponse struct {
+type PathResponse struct {
 	Path string
 }
 
-type statResponse struct {
+type StatResponse struct {
 	Stat Stat
 }
 
@@ -144,7 +144,7 @@ type CheckVersionRequest PathVersionRequest
 type closeRequest struct{}
 type closeResponse struct{}
 
-type connectRequest struct {
+type ConnectRequest struct {
 	ProtocolVersion int32
 	LastZxidSeen    int64
 	TimeOut         int32
@@ -152,7 +152,7 @@ type connectRequest struct {
 	Passwd          []byte
 }
 
-type connectResponse struct {
+type ConnectResponse struct {
 	ProtocolVersion int32
 	TimeOut         int32
 	SessionID       int64
@@ -174,7 +174,7 @@ type CreateTTLRequest struct {
 	Ttl   int64 // ms
 }
 
-type createResponse pathResponse
+type createResponse PathResponse
 type DeleteRequest PathVersionRequest
 type deleteResponse struct{}
 
@@ -182,36 +182,36 @@ type errorResponse struct {
 	Err int32
 }
 
-type existsRequest pathWatchRequest
-type existsResponse statResponse
-type getAclRequest pathRequest
+type existsRequest PathWatchRequest
+type existsResponse StatResponse
+type getAclRequest PathRequest
 
-type getAclResponse struct {
+type GetAclResponse struct {
 	Acl  []ACL
 	Stat Stat
 }
 
-type getChildrenRequest pathRequest
+type getChildrenRequest PathRequest
 
-type getChildrenResponse struct {
+type GetChildrenResponse struct {
 	Children []string
 }
 
-type getChildren2Request pathWatchRequest
+type getChildren2Request PathWatchRequest
 
 type getChildren2Response struct {
 	Children []string
 	Stat     Stat
 }
 
-type getDataRequest pathWatchRequest
+type getDataRequest PathWatchRequest
 
 type getDataResponse struct {
 	Data []byte
 	Stat Stat
 }
 
-type getMaxChildrenRequest pathRequest
+type getMaxChildrenRequest PathRequest
 
 type getMaxChildrenResponse struct {
 	Max int32
@@ -230,7 +230,7 @@ type setAclRequest struct {
 	Version int32
 }
 
-type setAclResponse statResponse
+type setAclResponse StatResponse
 
 type SetDataRequest struct {
 	Path    string
@@ -238,7 +238,7 @@ type SetDataRequest struct {
 	Version int32
 }
 
-type setDataResponse statResponse
+type setDataResponse StatResponse
 
 type setMaxChildren struct {
 	Path string
@@ -253,7 +253,7 @@ type setSaslResponse struct {
 	Token string
 }
 
-type setWatchesRequest struct {
+type SetWatchesRequest struct {
 	RelativeZxid int64
 	DataWatches  []string
 	ExistWatches []string
@@ -262,33 +262,33 @@ type setWatchesRequest struct {
 
 type setWatchesResponse struct{}
 
-type syncRequest pathRequest
-type syncResponse pathResponse
+type syncRequest PathRequest
+type syncResponse PathResponse
 
-type setAuthRequest auth
+type setAuthRequest Auth
 type setAuthResponse struct{}
 
-type multiRequestOp struct {
-	Header multiHeader
+type MultiRequestOp struct {
+	Header MultiHeader
 	Op     interface{}
 }
-type multiRequest struct {
-	Ops        []multiRequestOp
-	DoneHeader multiHeader
+type MultiRequest struct {
+	Ops        []MultiRequestOp
+	DoneHeader MultiHeader
 }
 type multiResponseOp struct {
-	Header multiHeader
+	Header MultiHeader
 	String string
 	Stat   *Stat
 	Err    ErrCode
 }
 type multiResponse struct {
 	Ops        []multiResponseOp
-	DoneHeader multiHeader
+	DoneHeader MultiHeader
 }
 
 // zk version 3.5 reconfig API
-type reconfigRequest struct {
+type ReconfigRequest struct {
 	JoiningServers []byte
 	LeavingServers []byte
 	NewMembers     []byte
@@ -299,18 +299,18 @@ type reconfigRequest struct {
 
 type reconfigReponse getDataResponse
 
-func (r *multiRequest) Encode(buf []byte) (int, error) {
+func (r *MultiRequest) Encode(buf []byte) (int, error) {
 	total := 0
 	for _, op := range r.Ops {
 		op.Header.Done = false
-		n, err := encodePacketValue(buf[total:], reflect.ValueOf(op))
+		n, err := EncodePacketValue(buf[total:], reflect.ValueOf(op))
 		if err != nil {
 			return total, err
 		}
 		total += n
 	}
 	r.DoneHeader.Done = true
-	n, err := encodePacketValue(buf[total:], reflect.ValueOf(r.DoneHeader))
+	n, err := EncodePacketValue(buf[total:], reflect.ValueOf(r.DoneHeader))
 	if err != nil {
 		return total, err
 	}
@@ -319,13 +319,13 @@ func (r *multiRequest) Encode(buf []byte) (int, error) {
 	return total, nil
 }
 
-func (r *multiRequest) Decode(buf []byte) (int, error) {
-	r.Ops = make([]multiRequestOp, 0)
-	r.DoneHeader = multiHeader{-1, true, -1}
+func (r *MultiRequest) Decode(buf []byte) (int, error) {
+	r.Ops = make([]MultiRequestOp, 0)
+	r.DoneHeader = MultiHeader{-1, true, -1}
 	total := 0
 	for {
-		header := &multiHeader{}
-		n, err := decodePacketValue(buf[total:], reflect.ValueOf(header))
+		header := &MultiHeader{}
+		n, err := DecodePacketValue(buf[total:], reflect.ValueOf(header))
 		if err != nil {
 			return total, err
 		}
@@ -335,16 +335,16 @@ func (r *multiRequest) Decode(buf []byte) (int, error) {
 			break
 		}
 
-		req := requestStructForOp(header.Type)
+		req := RequestStructForOp(header.Type)
 		if req == nil {
 			return total, ErrAPIError
 		}
-		n, err = decodePacketValue(buf[total:], reflect.ValueOf(req))
+		n, err = DecodePacketValue(buf[total:], reflect.ValueOf(req))
 		if err != nil {
 			return total, err
 		}
 		total += n
-		r.Ops = append(r.Ops, multiRequestOp{*header, req})
+		r.Ops = append(r.Ops, MultiRequestOp{*header, req})
 	}
 	return total, nil
 }
@@ -353,11 +353,11 @@ func (r *multiResponse) Decode(buf []byte) (int, error) {
 	var multiErr error
 
 	r.Ops = make([]multiResponseOp, 0)
-	r.DoneHeader = multiHeader{-1, true, -1}
+	r.DoneHeader = MultiHeader{-1, true, -1}
 	total := 0
 	for {
-		header := &multiHeader{}
-		n, err := decodePacketValue(buf[total:], reflect.ValueOf(header))
+		header := &MultiHeader{}
+		n, err := DecodePacketValue(buf[total:], reflect.ValueOf(header))
 		if err != nil {
 			return total, err
 		}
@@ -372,17 +372,17 @@ func (r *multiResponse) Decode(buf []byte) (int, error) {
 		switch header.Type {
 		default:
 			return total, ErrAPIError
-		case opError:
+		case OpError:
 			w = reflect.ValueOf(&res.Err)
-		case opCreate:
+		case OpCreate:
 			w = reflect.ValueOf(&res.String)
-		case opSetData:
+		case OpSetData:
 			res.Stat = new(Stat)
 			w = reflect.ValueOf(res.Stat)
-		case opCheck, opDelete:
+		case OpCheck, OpDelete:
 		}
 		if w.IsValid() {
-			n, err := decodePacketValue(buf[total:], w)
+			n, err := DecodePacketValue(buf[total:], w)
 			if err != nil {
 				return total, err
 			}
@@ -411,7 +411,7 @@ type encoder interface {
 	Encode(buf []byte) (int, error)
 }
 
-func decodePacket(buf []byte, st interface{}) (n int, err error) {
+func DecodePacket(buf []byte, st interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(runtime.Error); ok && strings.HasPrefix(e.Error(), "runtime error: slice bounds out of range") {
@@ -426,10 +426,10 @@ func decodePacket(buf []byte, st interface{}) (n int, err error) {
 	if v.Kind() != reflect.Ptr || v.IsNil() {
 		return 0, ErrPtrExpected
 	}
-	return decodePacketValue(buf, v)
+	return DecodePacketValue(buf, v)
 }
 
-func decodePacketValue(buf []byte, v reflect.Value) (int, error) {
+func DecodePacketValue(buf []byte, v reflect.Value) (int, error) {
 	rv := v
 	kind := v.Kind()
 	if kind == reflect.Ptr {
@@ -452,7 +452,7 @@ func decodePacketValue(buf []byte, v reflect.Value) (int, error) {
 		} else {
 			for i := 0; i < v.NumField(); i++ {
 				field := v.Field(i)
-				n2, err := decodePacketValue(buf[n:], field)
+				n2, err := DecodePacketValue(buf[n:], field)
 				n += n2
 				if err != nil {
 					return n, err
@@ -480,7 +480,7 @@ func decodePacketValue(buf []byte, v reflect.Value) (int, error) {
 			values := reflect.MakeSlice(v.Type(), count, count)
 			v.Set(values)
 			for i := 0; i < count; i++ {
-				n2, err := decodePacketValue(buf[n:], values.Index(i))
+				n2, err := DecodePacketValue(buf[n:], values.Index(i))
 				n += n2
 				if err != nil {
 					return n, err
@@ -502,7 +502,7 @@ func decodePacketValue(buf []byte, v reflect.Value) (int, error) {
 	return n, nil
 }
 
-func encodePacket(buf []byte, st interface{}) (n int, err error) {
+func EncodePacket(buf []byte, st interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(runtime.Error); ok && strings.HasPrefix(e.Error(), "runtime error: slice bounds out of range") {
@@ -517,10 +517,10 @@ func encodePacket(buf []byte, st interface{}) (n int, err error) {
 	if v.Kind() != reflect.Ptr || v.IsNil() {
 		return 0, ErrPtrExpected
 	}
-	return encodePacketValue(buf, v)
+	return EncodePacketValue(buf, v)
 }
 
-func encodePacketValue(buf []byte, v reflect.Value) (int, error) {
+func EncodePacketValue(buf []byte, v reflect.Value) (int, error) {
 	rv := v
 	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
 		v = v.Elem()
@@ -538,7 +538,7 @@ func encodePacketValue(buf []byte, v reflect.Value) (int, error) {
 		} else {
 			for i := 0; i < v.NumField(); i++ {
 				field := v.Field(i)
-				n2, err := encodePacketValue(buf[n:], field)
+				n2, err := EncodePacketValue(buf[n:], field)
 				n += n2
 				if err != nil {
 					return n, err
@@ -570,7 +570,7 @@ func encodePacketValue(buf []byte, v reflect.Value) (int, error) {
 			startN := n
 			n += 4
 			for i := 0; i < count; i++ {
-				n2, err := encodePacketValue(buf[n:], v.Index(i))
+				n2, err := EncodePacketValue(buf[n:], v.Index(i))
 				n += n2
 				if err != nil {
 					return n, err
@@ -592,44 +592,44 @@ func encodePacketValue(buf []byte, v reflect.Value) (int, error) {
 	return n, nil
 }
 
-func requestStructForOp(op int32) interface{} {
+func RequestStructForOp(op int32) interface{} {
 	switch op {
-	case opClose:
+	case OpClose:
 		return &closeRequest{}
-	case opCreate, opCreateContainer:
+	case OpCreate, OpCreateContainer:
 		return &CreateRequest{}
-	case opCreateTTL:
+	case OpCreateTTL:
 		return &CreateTTLRequest{}
-	case opDelete:
+	case OpDelete:
 		return &DeleteRequest{}
-	case opExists:
+	case OpExists:
 		return &existsRequest{}
-	case opGetAcl:
+	case OpGetAcl:
 		return &getAclRequest{}
-	case opGetChildren:
+	case OpGetChildren:
 		return &getChildrenRequest{}
-	case opGetChildren2:
+	case OpGetChildren2:
 		return &getChildren2Request{}
-	case opGetData:
+	case OpGetData:
 		return &getDataRequest{}
-	case opPing:
+	case OpPing:
 		return &pingRequest{}
-	case opSetAcl:
+	case OpSetAcl:
 		return &setAclRequest{}
-	case opSetData:
+	case OpSetData:
 		return &SetDataRequest{}
-	case opSetWatches:
-		return &setWatchesRequest{}
-	case opSync:
+	case OpSetWatches:
+		return &SetWatchesRequest{}
+	case OpSync:
 		return &syncRequest{}
-	case opSetAuth:
+	case OpSetAuth:
 		return &setAuthRequest{}
-	case opCheck:
+	case OpCheck:
 		return &CheckVersionRequest{}
-	case opMulti:
-		return &multiRequest{}
-	case opReconfig:
-		return &reconfigRequest{}
+	case OpMulti:
+		return &MultiRequest{}
+	case OpReconfig:
+		return &ReconfigRequest{}
 	}
 	return nil
 }

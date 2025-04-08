@@ -1,6 +1,7 @@
-package zk
+package tests
 
 import (
+	"github.com/NurramoX/gozookeeper/zk"
 	"sync"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func TestIntegration_BasicCluster(t *testing.T) {
 	}
 	defer zk2.Close()
 
-	if _, err := zk1.Create("/gozk-test", []byte("foo-cluster"), 0, WorldACL(PermAll)); err != nil {
+	if _, err := zk1.Create("/gozk-test", []byte("foo-cluster"), 0, zk.WorldACL(zk.PermAll)); err != nil {
 		t.Fatalf("Create failed on node 1: %+v", err)
 	}
 
@@ -55,24 +56,24 @@ func TestIntegration_ClientClusterFailover(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tc.Stop()
-	zk, evCh, err := tc.ConnectAll()
+	zookeeper, evCh, err := tc.ConnectAll()
 	if err != nil {
 		t.Fatalf("Connect returned error: %+v", err)
 	}
-	defer zk.Close()
+	defer zookeeper.Close()
 
 	sl := NewStateLogger(evCh)
 
-	hasSessionEvent1 := sl.NewWatcher(sessionStateMatcher(StateHasSession)).Wait(8 * time.Second)
+	hasSessionEvent1 := sl.NewWatcher(sessionStateMatcher(zk.StateHasSession)).Wait(8 * time.Second)
 	if hasSessionEvent1 == nil {
 		t.Fatalf("Failed to connect and get session")
 	}
 
-	if _, err := zk.Create("/gozk-test", []byte("foo-cluster"), 0, WorldACL(PermAll)); err != nil {
+	if _, err := zookeeper.Create("/gozk-test", []byte("foo-cluster"), 0, zk.WorldACL(zk.PermAll)); err != nil {
 		t.Fatalf("Create failed on node 1: %+v", err)
 	}
 
-	hasSessionWatcher2 := sl.NewWatcher(sessionStateMatcher(StateHasSession))
+	hasSessionWatcher2 := sl.NewWatcher(sessionStateMatcher(zk.StateHasSession))
 
 	// Kill the current leader
 	tc.StopServer(hasSessionEvent1.Server)
@@ -82,7 +83,7 @@ func TestIntegration_ClientClusterFailover(t *testing.T) {
 		t.Fatalf("Failover failed")
 	}
 
-	if by, _, err := zk.Get("/gozk-test"); err != nil {
+	if by, _, err := zookeeper.Get("/gozk-test"); err != nil {
 		t.Fatalf("Get failed on node 2: %+v", err)
 	} else if string(by) != "foo-cluster" {
 		t.Fatal("Wrong data for node 2")
@@ -97,25 +98,25 @@ func TestIntegration_NoQuorum(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tc.Stop()
-	zk, evCh, err := tc.ConnectAllTimeout(4 * time.Second)
+	zookeeper, evCh, err := tc.ConnectAllTimeout(4 * time.Second)
 	if err != nil {
 		t.Fatalf("Connect returned error: %+v", err)
 	}
-	defer zk.Close()
+	defer zookeeper.Close()
 	sl := NewStateLogger(evCh)
 
 	// Wait for initial session to be established
-	hasSessionEvent1 := sl.NewWatcher(sessionStateMatcher(StateHasSession)).Wait(8 * time.Second)
+	hasSessionEvent1 := sl.NewWatcher(sessionStateMatcher(zk.StateHasSession)).Wait(8 * time.Second)
 	if hasSessionEvent1 == nil {
 		t.Fatalf("Failed to connect and get session")
 	}
-	initialSessionID := zk.sessionID
-	DefaultLogger.Printf("    Session established: id=%d, timeout=%d", zk.sessionID, zk.sessionTimeoutMs)
+	initialSessionID := zookeeper.SessionID()
+	zk.DefaultLogger.Printf("    Session established: id=%d, timeout=%d", zookeeper.SessionID(), zookeeper.SessionTimeoutMs())
 
 	// Kill the ZooKeeper leader and wait for the session to reconnect.
-	DefaultLogger.Printf("    Kill the leader")
-	disconnectWatcher1 := sl.NewWatcher(sessionStateMatcher(StateDisconnected))
-	hasSessionWatcher2 := sl.NewWatcher(sessionStateMatcher(StateHasSession))
+	zk.DefaultLogger.Printf("    Kill the leader")
+	disconnectWatcher1 := sl.NewWatcher(sessionStateMatcher(zk.StateDisconnected))
+	hasSessionWatcher2 := sl.NewWatcher(sessionStateMatcher(zk.StateHasSession))
 	tc.StopServer(hasSessionEvent1.Server)
 
 	disconnectedEvent1 := disconnectWatcher1.Wait(8 * time.Second)
@@ -133,8 +134,8 @@ func TestIntegration_NoQuorum(t *testing.T) {
 	}
 
 	// Kill the ZooKeeper leader leaving the cluster without quorum.
-	DefaultLogger.Printf("    Kill the leader")
-	disconnectWatcher2 := sl.NewWatcher(sessionStateMatcher(StateDisconnected))
+	zk.DefaultLogger.Printf("    Kill the leader")
+	disconnectWatcher2 := sl.NewWatcher(sessionStateMatcher(zk.StateDisconnected))
 	tc.StopServer(hasSessionEvent2.Server)
 
 	disconnectedEvent2 := disconnectWatcher2.Wait(8 * time.Second)
@@ -147,13 +148,13 @@ func TestIntegration_NoQuorum(t *testing.T) {
 	}
 
 	// Make sure that we keep retrying connecting to the only remaining
-	// ZooKeeper server, but the attempts are being dropped because there is
+	// ZooKeeper Server, but the attempts are being dropped because there is
 	// no quorum.
-	DefaultLogger.Printf("    Retrying no luck...")
-	var firstDisconnect *Event
+	zk.DefaultLogger.Printf("    Retrying no luck...")
+	var firstDisconnect *zk.Event
 	begin := time.Now()
 	for time.Now().Sub(begin) < 6*time.Second {
-		disconnectedEvent := sl.NewWatcher(sessionStateMatcher(StateDisconnected)).Wait(4 * time.Second)
+		disconnectedEvent := sl.NewWatcher(sessionStateMatcher(zk.StateDisconnected)).Wait(4 * time.Second)
 		if disconnectedEvent == nil {
 			t.Fatalf("Disconnected event expected")
 		}
@@ -162,13 +163,13 @@ func TestIntegration_NoQuorum(t *testing.T) {
 			continue
 		}
 		if disconnectedEvent.Server != firstDisconnect.Server {
-			t.Fatalf("Disconnect from wrong server: expected=%s, actual=%s",
+			t.Fatalf("Disconnect from wrong Server: expected=%s, actual=%s",
 				firstDisconnect.Server, disconnectedEvent.Server)
 		}
 	}
 
 	// Start a ZooKeeper node to restore quorum.
-	hasSessionWatcher3 := sl.NewWatcher(sessionStateMatcher(StateHasSession))
+	hasSessionWatcher3 := sl.NewWatcher(sessionStateMatcher(zk.StateHasSession))
 	tc.StartServer(hasSessionEvent1.Server)
 
 	// Make sure that session is reconnected with the same ID.
@@ -176,12 +177,12 @@ func TestIntegration_NoQuorum(t *testing.T) {
 	if hasSessionEvent3 == nil {
 		t.Fatalf("Session has not been reconnected")
 	}
-	if zk.sessionID != initialSessionID {
-		t.Fatalf("Wrong session ID: expected=%d, actual=%d", initialSessionID, zk.sessionID)
+	if zookeeper.SessionID() != initialSessionID {
+		t.Fatalf("Wrong session ID: expected=%d, actual=%d", initialSessionID, zookeeper.SessionID())
 	}
 
 	// Make sure that the session is not dropped soon after reconnect
-	e := sl.NewWatcher(sessionStateMatcher(StateDisconnected)).Wait(6 * time.Second)
+	e := sl.NewWatcher(sessionStateMatcher(zk.StateDisconnected)).Wait(6 * time.Second)
 	if e != nil {
 		t.Fatalf("Unexpected disconnect")
 	}
@@ -193,7 +194,7 @@ func TestIntegration_WaitForClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ts.Stop()
-	zk, _, err := ts.Connect(0)
+	zookeeper, _, err := ts.Connect(0)
 	if err != nil {
 		t.Fatalf("Connect returned error: %+v", err)
 	}
@@ -201,19 +202,19 @@ func TestIntegration_WaitForClose(t *testing.T) {
 CONNECTED:
 	for {
 		select {
-		case ev := <-zk.eventChan:
-			if ev.State == StateConnected {
+		case ev := <-zookeeper.EventChan():
+			if ev.State == zk.StateConnected {
 				break CONNECTED
 			}
 		case <-timeout:
-			zk.Close()
+			zookeeper.Close()
 			t.Fatal("Timeout")
 		}
 	}
-	zk.Close()
+	zookeeper.Close()
 	for {
 		select {
-		case _, ok := <-zk.eventChan:
+		case _, ok := <-zookeeper.EventChan():
 			if !ok {
 				return
 			}
@@ -229,32 +230,32 @@ func TestIntegration_BadSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ts.Stop()
-	zk, _, err := ts.ConnectAll()
+	zookeeper, _, err := ts.ConnectAll()
 	if err != nil {
 		t.Fatalf("Connect returned error: %+v", err)
 	}
-	defer zk.Close()
+	defer zookeeper.Close()
 
-	if err := zk.Delete("/gozk-test", -1); err != nil && err != ErrNoNode {
+	if err := zookeeper.Delete("/gozk-test", -1); err != nil && err != zk.ErrNoNode {
 		t.Fatalf("Delete returned error: %+v", err)
 	}
 
-	zk.conn.Close()
+	zookeeper.Conn().Close()
 	time.Sleep(time.Millisecond * 100)
 
-	if err := zk.Delete("/gozk-test", -1); err != nil && err != ErrNoNode {
+	if err := zookeeper.Delete("/gozk-test", -1); err != nil && err != zk.ErrNoNode {
 		t.Fatalf("Delete returned error: %+v", err)
 	}
 }
 
 type EventLogger struct {
-	events   []Event
+	events   []zk.Event
 	watchers []*EventWatcher
 	lock     sync.Mutex
 	wg       sync.WaitGroup
 }
 
-func NewStateLogger(eventCh <-chan Event) *EventLogger {
+func NewStateLogger(eventCh <-chan zk.Event) *EventLogger {
 	el := &EventLogger{}
 	el.wg.Add(1)
 	go func() {
@@ -267,7 +268,7 @@ func NewStateLogger(eventCh <-chan Event) *EventLogger {
 					sw.matchCh <- event
 				}
 			}
-			DefaultLogger.Printf("    event received: %v\n", event)
+			zk.DefaultLogger.Printf("    event received: %v\n", event)
 			el.events = append(el.events, event)
 			el.lock.Unlock()
 		}
@@ -275,17 +276,17 @@ func NewStateLogger(eventCh <-chan Event) *EventLogger {
 	return el
 }
 
-func (el *EventLogger) NewWatcher(matcher func(Event) bool) *EventWatcher {
-	ew := &EventWatcher{matcher: matcher, matchCh: make(chan Event, 1)}
+func (el *EventLogger) NewWatcher(matcher func(zk.Event) bool) *EventWatcher {
+	ew := &EventWatcher{matcher: matcher, matchCh: make(chan zk.Event, 1)}
 	el.lock.Lock()
 	el.watchers = append(el.watchers, ew)
 	el.lock.Unlock()
 	return ew
 }
 
-func (el *EventLogger) Events() []Event {
+func (el *EventLogger) Events() []zk.Event {
 	el.lock.Lock()
-	transitions := make([]Event, len(el.events))
+	transitions := make([]zk.Event, len(el.events))
 	copy(transitions, el.events)
 	el.lock.Unlock()
 	return transitions
@@ -296,12 +297,12 @@ func (el *EventLogger) Wait4Stop() {
 }
 
 type EventWatcher struct {
-	matcher   func(Event) bool
-	matchCh   chan Event
+	matcher   func(zk.Event) bool
+	matchCh   chan zk.Event
 	triggered bool
 }
 
-func (ew *EventWatcher) Wait(timeout time.Duration) *Event {
+func (ew *EventWatcher) Wait(timeout time.Duration) *zk.Event {
 	select {
 	case event := <-ew.matchCh:
 		return &event
@@ -310,8 +311,8 @@ func (ew *EventWatcher) Wait(timeout time.Duration) *Event {
 	}
 }
 
-func sessionStateMatcher(s State) func(Event) bool {
-	return func(e Event) bool {
-		return e.Type == EventSession && e.State == s
+func sessionStateMatcher(s zk.State) func(zk.Event) bool {
+	return func(e zk.Event) bool {
+		return e.Type == zk.EventSession && e.State == s
 	}
 }

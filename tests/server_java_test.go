@@ -1,8 +1,9 @@
-package zk
+package tests
 
 import (
 	"context"
 	"fmt"
+	"github.com/NurramoX/gozookeeper/zk"
 	"io"
 	"os"
 	"os/exec"
@@ -13,7 +14,7 @@ import (
 type ErrMissingServerConfigField string
 
 func (e ErrMissingServerConfigField) Error() string {
-	return fmt.Sprintf("zk: missing server config field '%s'", string(e))
+	return fmt.Sprintf("zk: missing Server config field '%s'", string(e))
 }
 
 const (
@@ -25,18 +26,18 @@ const (
 	DefaultLeaderElectionPort             = 3888
 )
 
-type server struct {
+type Server struct {
 	stdout, stderr io.Writer
 	cmdString      string
 	cmdArgs        []string
 	cmdEnv         []string
 	cmd            *exec.Cmd
-	// this cancel will kill the command being run in this case the server itself.
+	// this cancel will kill the command being run in this case the Server itself.
 	cancelFunc context.CancelFunc
 }
 
-func NewIntegrationTestServer(t *testing.T, configPath string, stdout, stderr io.Writer) (*server, error) {
-	// allow external systems to configure this zk server bin path.
+func NewIntegrationTestServer(t *testing.T, configPath string, stdout, stderr io.Writer) (*Server, error) {
+	// allow external systems to configure this zk Server bin path.
 	zkPath := os.Getenv("ZOOKEEPER_BIN_PATH")
 	if zkPath == "" {
 		// default to a static reletive path that can be setup with a build system
@@ -52,7 +53,7 @@ func NewIntegrationTestServer(t *testing.T, configPath string, stdout, stderr io
 	// enable TTL
 	superString += ` -Dzookeeper.extendedTypesEnabled=true -Dzookeeper.emulate353TTLNodes=true`
 
-	return &server{
+	return &Server{
 		cmdString: filepath.Join(zkPath, "zkServer.sh"),
 		cmdArgs:   []string{"start-foreground", configPath},
 		cmdEnv:    []string{superString},
@@ -60,7 +61,7 @@ func NewIntegrationTestServer(t *testing.T, configPath string, stdout, stderr io
 	}, nil
 }
 
-func (srv *server) Start() error {
+func (srv *Server) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	srv.cancelFunc = cancel
 
@@ -72,7 +73,7 @@ func (srv *server) Start() error {
 	return srv.cmd.Start()
 }
 
-func (srv *server) Stop() error {
+func (srv *Server) Stop() error {
 	srv.cancelFunc()
 	return srv.cmd.Wait()
 }
@@ -96,7 +97,7 @@ type ServerConfig struct {
 }
 
 func (sc ServerConfig) Marshall(w io.Writer) error {
-	// the admin server is not wanted in test cases as it slows the startup process and is
+	// the admin Server is not wanted in test cases as it slows the startup process and is
 	// of little unit test value.
 	fmt.Fprintln(w, "admin.enableServer=false")
 	if sc.DataDir == "" {
@@ -116,7 +117,7 @@ func (sc ServerConfig) Marshall(w io.Writer) error {
 	}
 	fmt.Fprintf(w, "syncLimit=%d\n", sc.SyncLimit)
 	if sc.ClientPort <= 0 {
-		sc.ClientPort = DefaultPort
+		sc.ClientPort = zk.DefaultPort
 	}
 	fmt.Fprintf(w, "clientPort=%d\n", sc.ClientPort)
 	if sc.AutoPurgePurgeInterval > 0 {
@@ -132,11 +133,11 @@ func (sc ServerConfig) Marshall(w io.Writer) error {
 	fmt.Fprintln(w, "4lw.commands.whitelist=*")
 
 	if len(sc.Servers) < 2 {
-		// if we dont have more than 2 servers we just dont specify server list to start in standalone mode
+		// if we dont have more than 2 servers we just dont specify Server list to start in standalone mode
 		// see https://zookeeper.apache.org/doc/current/zookeeperStarted.html#sc_InstallingSingleMode for more details.
 		return nil
 	}
-	// if we then have more than one server force it to be distributed
+	// if we then have more than one Server force it to be distributed
 	fmt.Fprintln(w, "standaloneEnabled=false")
 
 	for _, srv := range sc.Servers {
@@ -146,21 +147,21 @@ func (sc ServerConfig) Marshall(w io.Writer) error {
 		if srv.LeaderElectionPort <= 0 {
 			srv.LeaderElectionPort = DefaultLeaderElectionPort
 		}
-		fmt.Fprintf(w, "server.%d=%s:%d:%d\n", srv.ID, srv.Host, srv.PeerPort, srv.LeaderElectionPort)
+		fmt.Fprintf(w, "Server.%d=%s:%d:%d\n", srv.ID, srv.Host, srv.PeerPort, srv.LeaderElectionPort)
 	}
 	return nil
 }
 
 // this is a helper to wait for the zk connection to at least get to the HasSession state
-func waitForSession(ctx context.Context, eventChan <-chan Event) error {
+func waitForSession(ctx context.Context, eventChan <-chan zk.Event) error {
 	select {
 	case event, ok := <-eventChan:
-		// The eventChan is used solely to determine when the ZK conn has
+		// The eventChan is used solely to determine when the ZK testConn has
 		// stopped.
 		if !ok {
 			return fmt.Errorf("connection closed before state reached")
 		}
-		if event.State == StateHasSession {
+		if event.State == zk.StateHasSession {
 			return nil
 		}
 	case <-ctx.Done():

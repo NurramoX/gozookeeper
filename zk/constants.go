@@ -12,29 +12,29 @@ const (
 )
 
 const (
-	opNotify          = 0
-	opCreate          = 1
-	opDelete          = 2
-	opExists          = 3
-	opGetData         = 4
-	opSetData         = 5
-	opGetAcl          = 6
-	opSetAcl          = 7
-	opGetChildren     = 8
-	opSync            = 9
-	opPing            = 11
-	opGetChildren2    = 12
-	opCheck           = 13
-	opMulti           = 14
-	opReconfig        = 16
-	opCreateContainer = 19
-	opCreateTTL       = 21
-	opClose           = -11
-	opSetAuth         = 100
-	opSetWatches      = 101
-	opError           = -1
+	OpNotify          = 0
+	OpCreate          = 1
+	OpDelete          = 2
+	OpExists          = 3
+	OpGetData         = 4
+	OpSetData         = 5
+	OpGetAcl          = 6
+	OpSetAcl          = 7
+	OpGetChildren     = 8
+	OpSync            = 9
+	OpPing            = 11
+	OpGetChildren2    = 12
+	OpCheck           = 13
+	OpMulti           = 14
+	OpReconfig        = 16
+	OpCreateContainer = 19
+	OpCreateTTL       = 21
+	OpClose           = -11
+	OpSetAuth         = 100
+	OpSetWatches      = 101
+	OpError           = -1
 	// Not in protocol, used internally
-	opWatcherEvent = -2
+	OpWatcherEvent = -2
 )
 
 const (
@@ -198,29 +198,29 @@ const (
 
 var (
 	emptyPassword = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	opNames       = map[int32]string{
-		opNotify:          "notify",
-		opCreate:          "create",
-		opCreateContainer: "createContainer",
-		opCreateTTL:       "createTTL",
-		opDelete:          "delete",
-		opExists:          "exists",
-		opGetData:         "getData",
-		opSetData:         "setData",
-		opGetAcl:          "getACL",
-		opSetAcl:          "setACL",
-		opGetChildren:     "getChildren",
-		opSync:            "sync",
-		opPing:            "ping",
-		opGetChildren2:    "getChildren2",
-		opCheck:           "check",
-		opMulti:           "multi",
-		opReconfig:        "reconfig",
-		opClose:           "close",
-		opSetAuth:         "setAuth",
-		opSetWatches:      "setWatches",
+	OpNames       = map[int32]string{
+		OpNotify:          "notify",
+		OpCreate:          "create",
+		OpCreateContainer: "createContainer",
+		OpCreateTTL:       "createTTL",
+		OpDelete:          "delete",
+		OpExists:          "exists",
+		OpGetData:         "getData",
+		OpSetData:         "setData",
+		OpGetAcl:          "getACL",
+		OpSetAcl:          "setACL",
+		OpGetChildren:     "getChildren",
+		OpSync:            "sync",
+		OpPing:            "ping",
+		OpGetChildren2:    "getChildren2",
+		OpCheck:           "check",
+		OpMulti:           "multi",
+		OpReconfig:        "reconfig",
+		OpClose:           "close",
+		OpSetAuth:         "setAuth",
+		OpSetWatches:      "setWatches",
 
-		opWatcherEvent: "watcherEvent",
+		OpWatcherEvent: "watcherEvent",
 	}
 )
 

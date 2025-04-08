@@ -23,8 +23,8 @@ type Lock struct {
 	seq      int
 }
 
-// NewLock creates a new lock instance using the provided connection, path, and acl.
-// The path must be a node that is only used by this lock. A lock instances starts
+// NewLock creates a new lock instance using the provided connection, Path, and acl.
+// The Path must be a node that is only used by this lock. A lock instances starts
 // unlocked until Lock() is called.
 func NewLock(c *Conn, path string, acl []ACL) *Lock {
 	return &Lock{
@@ -34,7 +34,7 @@ func NewLock(c *Conn, path string, acl []ACL) *Lock {
 	}
 }
 
-func parseSeq(path string) (int, error) {
+func ParseSeq(path string) (int, error) {
 	parts := strings.Split(path, "lock-")
 	// python client uses a __LOCK__ prefix
 	if len(parts) == 1 {
@@ -92,7 +92,7 @@ func (l *Lock) LockWithData(data []byte) error {
 		return err
 	}
 
-	seq, err := parseSeq(path)
+	seq, err := ParseSeq(path)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (l *Lock) LockWithData(data []byte) error {
 		prevSeq := -1
 		prevSeqPath := ""
 		for _, p := range children {
-			s, err := parseSeq(p)
+			s, err := ParseSeq(p)
 			if err != nil {
 				return err
 			}

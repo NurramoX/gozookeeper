@@ -1,16 +1,17 @@
-package zk
+package tests
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"github.com/NurramoX/gozookeeper/zk"
+	"io"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestIntegration_RecurringReAuthHang(t *testing.T) {
-	zkC, err := StartTestCluster(t, 3, ioutil.Discard, ioutil.Discard)
+	zkC, err := StartTestCluster(t, 3, io.Discard, io.Discard)
 	if err != nil {
 		panic(err)
 	}
@@ -31,13 +32,13 @@ func TestIntegration_RecurringReAuthHang(t *testing.T) {
 
 	var reauthCloseOnce sync.Once
 	reauthSig := make(chan struct{}, 1)
-	conn.resendZkAuthFn = func(ctx context.Context, c *Conn) error {
+	conn.SetResendZkAuthFn(func(ctx context.Context, c *zk.Conn) error {
 		// in current implimentation the reauth might be called more than once based on various conditions
 		reauthCloseOnce.Do(func() { close(reauthSig) })
-		return resendZkAuth(ctx, c)
-	}
+		return zk.ResendZkAuth(ctx, c)
+	})
 
-	conn.debugCloseRecvLoop = true
+	conn.SetDebugCloseRecvLoop(true)
 	currentServer := conn.Server()
 	zkC.StopServer(currentServer)
 	// wait connect to new zookeeper.
@@ -59,7 +60,7 @@ func TestIntegration_RecurringReAuthHang(t *testing.T) {
 
 func TestConcurrentReadAndClose(t *testing.T) {
 	WithListenServer(t, func(server string) {
-		conn, _, err := Connect([]string{server}, 15*time.Second)
+		conn, _, err := zk.Connect([]string{server}, 15*time.Second)
 		if err != nil {
 			t.Fatalf("Failed to create Connection %s", err)
 		}
@@ -67,7 +68,7 @@ func TestConcurrentReadAndClose(t *testing.T) {
 		okChan := make(chan struct{})
 		var setErr error
 		go func() {
-			_, setErr = conn.Create("/test-path", []byte("test data"), 0, WorldACL(PermAll))
+			_, setErr = conn.Create("/test-path", []byte("test data"), 0, zk.WorldACL(zk.PermAll))
 			close(okChan)
 		}()
 
@@ -78,7 +79,7 @@ func TestConcurrentReadAndClose(t *testing.T) {
 
 		select {
 		case <-okChan:
-			if setErr != ErrConnectionClosed {
+			if setErr != zk.ErrConnectionClosed {
 				t.Fatalf("unexpected error returned from Set %v", setErr)
 			}
 		case <-time.After(3 * time.Second):
@@ -88,15 +89,15 @@ func TestConcurrentReadAndClose(t *testing.T) {
 }
 
 func TestDeadlockInClose(t *testing.T) {
-	c := &Conn{
-		shouldQuit:     make(chan struct{}),
-		connectTimeout: 1 * time.Second,
-		sendChan:       make(chan *request, sendChanSize),
-		logger:         DefaultLogger,
+	c := &zk.Conn{
+		ShouldQuit:     make(chan struct{}),
+		ConnectTimeout: 1 * time.Second,
+		SendChan:       make(chan *zk.Request, zk.SendChanSize),
+		Logger:         zk.DefaultLogger,
 	}
 
-	for i := 0; i < sendChanSize; i++ {
-		c.sendChan <- &request{}
+	for i := 0; i < zk.SendChanSize; i++ {
+		c.SendChan <- &zk.Request{}
 	}
 
 	okChan := make(chan struct{})
@@ -114,51 +115,51 @@ func TestDeadlockInClose(t *testing.T) {
 
 func TestNotifyWatches(t *testing.T) {
 	cases := []struct {
-		eType   EventType
+		eType   zk.EventType
 		path    string
-		watches map[watchPathType]bool
+		watches map[zk.WatchPathType]bool
 	}{
 		{
-			EventNodeCreated, "/",
-			map[watchPathType]bool{
-				{"/", watchTypeExist}: true,
-				{"/", watchTypeChild}: false,
-				{"/", watchTypeData}:  false,
+			zk.EventNodeCreated, "/",
+			map[zk.WatchPathType]bool{
+				{"/", zk.WatchTypeExist}: true,
+				{"/", zk.WatchTypeChild}: false,
+				{"/", zk.WatchTypeData}:  false,
 			},
 		},
 		{
-			EventNodeCreated, "/a",
-			map[watchPathType]bool{
-				{"/b", watchTypeExist}: false,
+			zk.EventNodeCreated, "/a",
+			map[zk.WatchPathType]bool{
+				{"/b", zk.WatchTypeExist}: false,
 			},
 		},
 		{
-			EventNodeDataChanged, "/",
-			map[watchPathType]bool{
-				{"/", watchTypeExist}: true,
-				{"/", watchTypeData}:  true,
-				{"/", watchTypeChild}: false,
+			zk.EventNodeDataChanged, "/",
+			map[zk.WatchPathType]bool{
+				{"/", zk.WatchTypeExist}: true,
+				{"/", zk.WatchTypeData}:  true,
+				{"/", zk.WatchTypeChild}: false,
 			},
 		},
 		{
-			EventNodeChildrenChanged, "/",
-			map[watchPathType]bool{
-				{"/", watchTypeExist}: false,
-				{"/", watchTypeData}:  false,
-				{"/", watchTypeChild}: true,
+			zk.EventNodeChildrenChanged, "/",
+			map[zk.WatchPathType]bool{
+				{"/", zk.WatchTypeExist}: false,
+				{"/", zk.WatchTypeData}:  false,
+				{"/", zk.WatchTypeChild}: true,
 			},
 		},
 		{
-			EventNodeDeleted, "/",
-			map[watchPathType]bool{
-				{"/", watchTypeExist}: true,
-				{"/", watchTypeData}:  true,
-				{"/", watchTypeChild}: true,
+			zk.EventNodeDeleted, "/",
+			map[zk.WatchPathType]bool{
+				{"/", zk.WatchTypeExist}: true,
+				{"/", zk.WatchTypeData}:  true,
+				{"/", zk.WatchTypeChild}: true,
 			},
 		},
 	}
 
-	conn := &Conn{watchers: make(map[watchPathType][]chan Event)}
+	conn := &zk.Conn{Watchers: make(map[zk.WatchPathType][]chan zk.Event)}
 
 	for idx, c := range cases {
 		t.Run(fmt.Sprintf("#%d %s", idx, c.eType), func(t *testing.T) {
@@ -167,19 +168,19 @@ func TestNotifyWatches(t *testing.T) {
 			notifications := make([]struct {
 				path   string
 				notify bool
-				ch     <-chan Event
+				ch     <-chan zk.Event
 			}, len(c.watches))
 
 			var idx int
 			for wpt, expectEvent := range c.watches {
-				ch := conn.addWatcher(wpt.path, wpt.wType)
-				notifications[idx].path = wpt.path
+				ch := conn.AddWatcher(wpt.Path, wpt.WType)
+				notifications[idx].path = wpt.Path
 				notifications[idx].notify = expectEvent
 				notifications[idx].ch = ch
 				idx++
 			}
-			ev := Event{Type: c.eType, Path: c.path}
-			conn.notifyWatches(ev)
+			ev := zk.Event{Type: c.eType, Path: c.path}
+			conn.NotifyWatches(ev)
 
 			for _, res := range notifications {
 				select {

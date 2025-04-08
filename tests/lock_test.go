@@ -1,6 +1,7 @@
-package zk
+package tests
 
 import (
+	"github.com/NurramoX/gozookeeper/zk"
 	"testing"
 	"time"
 )
@@ -11,15 +12,15 @@ func TestIntegration_Lock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ts.Stop()
-	zk, _, err := ts.ConnectAll()
+	zookeeper, _, err := ts.ConnectAll()
 	if err != nil {
-		t.Fatalf("Connect returned error: %+v", err)
+		t.Fatalf("Connect returned error: %v", err)
 	}
-	defer zk.Close()
+	defer zookeeper.Close()
 
-	acls := WorldACL(PermAll)
+	acls := zk.WorldACL(zk.PermAll)
 
-	l := NewLock(zk, "/test", acls)
+	l := zk.NewLock(zookeeper, "/test", acls)
 	if err := l.Lock(); err != nil {
 		t.Fatal(err)
 	}
@@ -33,14 +34,16 @@ func TestIntegration_Lock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	l2 := NewLock(zk, "/test", acls)
+	l2 := zk.NewLock(zookeeper, "/test", acls)
 	go func() {
 		if err := l2.Lock(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			return
 		}
 		val <- 2
 		if err := l2.Unlock(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			return
 		}
 		val <- 3
 	}()
@@ -70,22 +73,22 @@ func TestIntegration_MultiLevelLock(t *testing.T) {
 	}
 	defer ts.Stop()
 
-	zk, _, err := ts.ConnectAll()
+	zookeeper, _, err := ts.ConnectAll()
 	if err != nil {
 		t.Fatalf("Connect returned error: %+v", err)
 	}
-	defer zk.Close()
+	defer zookeeper.Close()
 
-	acls := WorldACL(PermAll)
+	acls := zk.WorldACL(zk.PermAll)
 	path := "/test-multi-level"
-	if p, err := zk.Create(path, []byte{1, 2, 3, 4}, 0, WorldACL(PermAll)); err != nil {
+	if p, err := zookeeper.Create(path, []byte{1, 2, 3, 4}, 0, zk.WorldACL(zk.PermAll)); err != nil {
 		t.Fatalf("Create returned error: %+v", err)
 	} else if p != path {
 		t.Fatalf("Create returned different path '%s' != '%s'", p, path)
 	}
-	l := NewLock(zk, "/test-multi-level/lock", acls)
-	defer zk.Delete("/test-multi-level", -1) // Clean up what we've created for this test
-	defer zk.Delete("/test-multi-level/lock", -1)
+	l := zk.NewLock(zookeeper, "/test-multi-level/lock", acls)
+	defer zookeeper.Delete("/test-multi-level", -1) // Clean up what we've created for this test
+	defer zookeeper.Delete("/test-multi-level/lock", -1)
 	if err := l.Lock(); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +104,7 @@ func TestParseSeq(t *testing.T) {
 		pyLock       = "da5719988c244fc793f49ec3aa29b566__lock__0000000003"
 	)
 
-	seq, err := parseSeq(goLock)
+	seq, err := zk.ParseSeq(goLock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +112,7 @@ func TestParseSeq(t *testing.T) {
 		t.Fatalf("Expected 0 instead of %d", seq)
 	}
 
-	seq, err = parseSeq(negativeLock)
+	seq, err = zk.ParseSeq(negativeLock)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +120,7 @@ func TestParseSeq(t *testing.T) {
 		t.Fatalf("Expected -2147483648 instead of %d", seq)
 	}
 
-	seq, err = parseSeq(pyLock)
+	seq, err = zk.ParseSeq(pyLock)
 	if err != nil {
 		t.Fatal(err)
 	}

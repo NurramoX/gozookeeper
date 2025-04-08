@@ -1,6 +1,7 @@
-package zk
+package tests
 
 import (
+	"github.com/NurramoX/gozookeeper/zk"
 	"net"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func TestFLWRuok(t *testing.T) {
 
 	go tcpServer(l, "")
 
-	oks := FLWRuok([]string{l.Addr().String()}, time.Second*10)
+	oks := zk.FLWRuok([]string{l.Addr().String()}, time.Second*10)
 	if len(oks) == 0 {
 		t.Errorf("no values returned")
 	}
@@ -53,7 +54,7 @@ func TestFLWRuok(t *testing.T) {
 
 	go tcpServer(l, "dead")
 
-	oks = FLWRuok([]string{l.Addr().String()}, time.Second*10)
+	oks = zk.FLWRuok([]string{l.Addr().String()}, time.Second*10)
 	if len(oks) == 0 {
 		t.Errorf("no values returned")
 	}
@@ -72,7 +73,7 @@ func TestFLWSrvr(t *testing.T) {
 
 	go tcpServer(l, "")
 
-	statsSlice, ok := FLWSrvr([]string{l.Addr().String()}, time.Second*10)
+	statsSlice, ok := zk.FLWSrvr([]string{l.Addr().String()}, time.Second*10)
 	if !ok {
 		t.Errorf("failure indicated on 'srvr' parsing")
 	}
@@ -126,7 +127,7 @@ func TestFLWSrvr(t *testing.T) {
 		t.Errorf("Counter != 175804215")
 	}
 
-	if stats.Mode != ModeLeader {
+	if stats.Mode != zk.ModeLeader {
 		t.Errorf("Mode != ModeLeader")
 	}
 
@@ -145,7 +146,7 @@ func TestFLWCons(t *testing.T) {
 
 	go tcpServer(l, "")
 
-	clients, ok := FLWCons([]string{l.Addr().String()}, time.Second*10)
+	clients, ok := zk.FLWCons([]string{l.Addr().String()}, time.Second*10)
 	if !ok {
 		t.Errorf("failure indicated on 'cons' parsing")
 	}
@@ -153,7 +154,7 @@ func TestFLWCons(t *testing.T) {
 		t.Errorf("no *ServerClients instances returned")
 	}
 
-	results := []*ServerClient{
+	results := []*zk.ServerClient{
 		{
 			Queued:        0,
 			Received:      9435,

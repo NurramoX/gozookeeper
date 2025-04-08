@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/NurramoX/gozookeeper"
+	"github.com/NurramoX/gozookeeper/zk"
 	"time"
 )
 

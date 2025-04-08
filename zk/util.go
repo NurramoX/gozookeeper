@@ -11,10 +11,10 @@ import (
 )
 
 // AuthACL produces an ACL list containing a single ACL which uses the
-// provided permissions, with the scheme "auth", and ID "", which is used
+// provided permissions, with the scheme "Auth", and ID "", which is used
 // by ZooKeeper to represent any authenticated user.
 func AuthACL(perms int32) []ACL {
-	return []ACL{{perms, "auth", ""}}
+	return []ACL{{perms, "Auth", ""}}
 }
 
 // WorldACL produces an ACL list containing a single ACL which uses the
@@ -57,8 +57,8 @@ func stringShuffle(s []string) {
 	}
 }
 
-// validatePath will make sure a path is valid before sending the request
-func validatePath(path string, isSequential bool) error {
+// validatePath will make sure a Path is valid before sending the Request
+func ValidatePath(path string, isSequential bool) error {
 	if path == "" {
 		return ErrInvalidPath
 	}
@@ -69,7 +69,7 @@ func validatePath(path string, isSequential bool) error {
 
 	n := len(path)
 	if n == 1 {
-		// path is just the root
+		// Path is just the root
 		return nil
 	}
 

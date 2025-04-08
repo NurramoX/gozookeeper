@@ -1,7 +1,8 @@
-package zk
+package tests
 
 import (
 	"fmt"
+	"github.com/NurramoX/gozookeeper/zk"
 	"io"
 	"math/rand"
 	"os"
@@ -19,7 +20,7 @@ const (
 type TestServer struct {
 	Port   int
 	Path   string
-	Srv    *server
+	Srv    *Server
 	Config ServerConfigServer
 }
 
@@ -40,7 +41,7 @@ func StartTestCluster(t *testing.T, size int, stdout, stderr io.Writer) (*TestCl
 	}
 
 	if testing.Verbose() {
-		// if testing verbose we just spam the server logs as many issues with tests will have the ZK server
+		// if testing verbose we just spam the Server logs as many issues with tests will have the ZK Server
 		// logs have the cause of the failure in it.
 		if stdout == nil {
 			stdout = os.Stderr
@@ -63,7 +64,7 @@ func StartTestCluster(t *testing.T, size int, stdout, stderr io.Writer) (*TestCl
 
 	for serverN := 0; serverN < size; serverN++ {
 		srvPath := filepath.Join(tmpPath, fmt.Sprintf("srv%d", serverN+1))
-		requireNoErrorf(t, os.Mkdir(srvPath, 0700), "failed to make server path")
+		requireNoErrorf(t, os.Mkdir(srvPath, 0700), "failed to make Server path")
 
 		port := startPort + serverN*3
 		cfg := ServerConfig{
@@ -121,25 +122,25 @@ func StartTestCluster(t *testing.T, size int, stdout, stderr io.Writer) (*TestCl
 	return cluster, nil
 }
 
-func (tc *TestCluster) Connect(idx int) (*Conn, <-chan Event, error) {
-	return Connect([]string{fmt.Sprintf("127.0.0.1:%d", tc.Servers[idx].Port)}, time.Second*15)
+func (tc *TestCluster) Connect(idx int) (*zk.Conn, <-chan zk.Event, error) {
+	return zk.Connect([]string{fmt.Sprintf("127.0.0.1:%d", tc.Servers[idx].Port)}, time.Second*15)
 }
 
-func (tc *TestCluster) ConnectAll() (*Conn, <-chan Event, error) {
+func (tc *TestCluster) ConnectAll() (*zk.Conn, <-chan zk.Event, error) {
 	return tc.ConnectAllTimeout(time.Second * 15)
 }
 
-func (tc *TestCluster) ConnectAllTimeout(sessionTimeout time.Duration) (*Conn, <-chan Event, error) {
+func (tc *TestCluster) ConnectAllTimeout(sessionTimeout time.Duration) (*zk.Conn, <-chan zk.Event, error) {
 	return tc.ConnectWithOptions(sessionTimeout)
 }
 
-func (tc *TestCluster) ConnectWithOptions(sessionTimeout time.Duration, options ...connOption) (*Conn, <-chan Event, error) {
+func (tc *TestCluster) ConnectWithOptions(sessionTimeout time.Duration, options ...zk.ConnOption) (*zk.Conn, <-chan zk.Event, error) {
 	hosts := make([]string, len(tc.Servers))
 	for i, srv := range tc.Servers {
 		hosts[i] = fmt.Sprintf("127.0.0.1:%d", srv.Port)
 	}
-	zk, ch, err := Connect(hosts, sessionTimeout, options...)
-	return zk, ch, err
+	zookeeper, ch, err := zk.Connect(hosts, sessionTimeout, options...)
+	return zookeeper, ch, err
 }
 
 func (tc *TestCluster) Stop() error {
@@ -159,7 +160,7 @@ func (tc *TestCluster) waitForStart(maxRetry int, interval time.Duration) error 
 	}
 
 	for i := 0; i < maxRetry; i++ {
-		_, ok := FLWSrvr(serverAddrs, time.Second)
+		_, ok := zk.FLWSrvr(serverAddrs, time.Second)
 		if ok {
 			return nil
 		}
@@ -180,7 +181,7 @@ func (tc *TestCluster) waitForStop(maxRetry int, interval time.Duration) error {
 	var success bool
 	for i := 0; i < maxRetry && !success; i++ {
 		success = true
-		for _, ok := range FLWRuok(serverAddrs, time.Second) {
+		for _, ok := range zk.FLWRuok(serverAddrs, time.Second) {
 			if ok {
 				success = false
 			}
@@ -202,7 +203,7 @@ func (tc *TestCluster) StartServer(server string) {
 			return
 		}
 	}
-	panic(fmt.Sprintf("unknown server: %s", server))
+	panic(fmt.Sprintf("unknown Server: %s", server))
 }
 
 func (tc *TestCluster) StopServer(server string) {
@@ -212,13 +213,13 @@ func (tc *TestCluster) StopServer(server string) {
 			return
 		}
 	}
-	panic(fmt.Sprintf("unknown server: %s", server))
+	panic(fmt.Sprintf("unknown Server: %s", server))
 }
 
 func (tc *TestCluster) StartAllServers() error {
 	for _, s := range tc.Servers {
 		if err := s.Srv.Start(); err != nil {
-			return fmt.Errorf("failed to start server listening on port `%d` : %+v", s.Port, err)
+			return fmt.Errorf("failed to start Server listening on port `%d` : %+v", s.Port, err)
 		}
 	}
 
@@ -233,7 +234,7 @@ func (tc *TestCluster) StopAllServers() error {
 	var err error
 	for _, s := range tc.Servers {
 		if err := s.Srv.Stop(); err != nil {
-			err = fmt.Errorf("failed to stop server listening on port `%d` : %v", s.Port, err)
+			err = fmt.Errorf("failed to stop Server listening on port `%d` : %v", s.Port, err)
 		}
 	}
 	if err != nil {

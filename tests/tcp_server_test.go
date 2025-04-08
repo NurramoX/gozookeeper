@@ -1,4 +1,4 @@
-package zk
+package tests
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ func WithListenServer(t *testing.T, test func(server string)) {
 	server := fmt.Sprintf("localhost:%d", startPort)
 	l, err := net.Listen("tcp", server)
 	if err != nil {
-		t.Fatalf("Failed to start listen server: %v", err)
+		t.Fatalf("Failed to start listen Server: %v", err)
 	}
 	defer l.Close()
 
